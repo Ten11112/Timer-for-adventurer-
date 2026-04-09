@@ -353,11 +353,11 @@
 </div>
 <script>
 // ===== STATE =====
-// Start with EMPTY quest list — no default goblin quests
 let quests    = JSON.parse(localStorage.getItem('rqt_quests') || '[]');
 let completed = JSON.parse(localStorage.getItem('rqt_done')   || '[]');
 let qi=0, secs=0, running=false, iv=null;
 let dayPct=0, editingIndex=-1, deleteIndex=-1, formMode='new', selColor='#2255cc';
+let questStartSecs = 0; // tracks total seconds allocated (including added time)
 
 function save() {
   localStorage.setItem('rqt_quests', JSON.stringify(quests));
@@ -375,6 +375,7 @@ function openStats()  { renderStats();  gotoScreen('screen-stats'); }
 // ===== TIMER =====
 function loadQuest(index) {
   qi = index; secs = quests[qi].time * 60; dayPct = 0;
+  questStartSecs = secs; // record initial allocation
   running = false; clearInterval(iv);
   refreshDisplay(); refreshBars();
   gotoScreen('screen-timer');
@@ -406,6 +407,7 @@ function toggleTimer() {
 function resetTimer() {
   clearInterval(iv); running = false;
   secs = (quests[qi]?.time || 25) * 60;
+  questStartSecs = secs;
   dayPct = 0; moveSun(); refreshDisplay();
   document.getElementById('pauseBtn').textContent = '▶ Start';
 }
@@ -548,8 +550,9 @@ function confirmDelete() {
 function questDone() {
   const q = quests[qi];
   if (q) {
-    const used = q.time - Math.floor(secs/60);
-    completed.push({ name: q.name, minutes: Math.max(used, 1), color: q.color });
+    // actual time used = total allocated - remaining
+    const actualMinutes = Math.max(Math.round((questStartSecs - secs) / 60), 1);
+    completed.push({ name: q.name, minutes: actualMinutes, color: q.color });
     quests[qi].done = true;
     save();
   }
@@ -574,6 +577,7 @@ function confirmAddTime() {
   const mins = parseInt(document.getElementById('addTimeInput').value) || 5;
   if (mins < 1) { alert('Please enter at least 1 minute!'); return; }
   secs += mins * 60;
+  questStartSecs += mins * 60; // also expand the total so elapsed is correct
   closeModal('modal-addtime');
   refreshDisplay();
   if (!running) toggleTimer();
