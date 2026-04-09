@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quest Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-dark: #1a0e05;
+    --parchment: #c8a46e;
+    --parchment-dark: #a07840;
+    --parchment-light: #e8c88e;
+    --wood: #5c3310;
+    --wood-dark: #3d1f0a;
+    --gold: #c8902a;
+    --text-gold: #f0d060;
+    --text-light: #f5e8c0;
+    --text-dark: #3d1f0a;
+    --btn-green: #2d6e1f;
+    --btn-green-light: #3d9e2a;
+    --btn-red: #7a1515;
+    --btn-red-light: #a02020;
+    --btn-orange: #8a5010;
+    --btn-orange-light: #c07020;
+    --btn-purple: #4a2880;
+    --btn-purple-light: #6a40b0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; image-rendering: pixelated; }
+  body {
+    background: var(--bg-dark);
+    font-family: 'Press Start 2P', monospace;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(0,0,0,0.3) 31px, rgba(0,0,0,0.3) 32px),
+      repeating-linear-gradient(90deg, transparent, transparent 47px, rgba(0,0,0,0.2) 47px, rgba(0,0,0,0.2) 48px);
+    background-color: #1e140a; z-index: 0;
+  }
+  .app { position: relative; z-index: 1; width: 100%; max-width: 860px; padding: 16px; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .scroll-frame {
+    background: var(--parchment);
+    border: 6px solid var(--wood-dark); border-radius: 4px;
+    box-shadow: 0 0 0 2px var(--gold), 8px 8px 0 rgba(0,0,0,0.6);
+  }
+  .scroll-frame::before, .scroll-frame::after {
+    content: ''; display: block; height: 28px;
+    background: linear-gradient(to bottom, var(--wood), var(--wood-dark));
+    border-top: 3px solid var(--gold); border-bottom: 3px solid var(--gold);
+  }
+  .parchment-body {
+    background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px), var(--parchment);
+    padding: 20px 24px; position: relative;
+  }
+  .banner {
+    background: var(--wood-dark); border: 3px solid var(--gold); border-radius: 2px;
+    padding: 8px 20px; text-align: center; margin: -40px auto 16px;
+    width: fit-content; box-shadow: 0 3px 0 rgba(0,0,0,0.5);
+  }
+  .banner h1 { color: var(--text-gold); font-size: 12px; letter-spacing: 2px; text-shadow: 2px 2px 0 #000; }
+  .rpg-btn {
+    font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px 14px;
+    border: 3px solid rgba(0,0,0,0.5); border-radius: 2px; cursor: pointer;
+    letter-spacing: 1px; color: var(--text-light); text-shadow: 1px 1px 0 #000;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.5); transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .rpg-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.5); }
+  .btn-green  { background: linear-gradient(to bottom, var(--btn-green-light),  var(--btn-green)); }
+  .btn-red    { background: linear-gradient(to bottom, var(--btn-red-light),    var(--btn-red)); }
+  .btn-orange { background: linear-gradient(to bottom, var(--btn-orange-light), var(--btn-orange)); }
+  .btn-purple { background: linear-gradient(to bottom, var(--btn-purple-light), var(--btn-purple)); }
+  .btn-wood   { background: linear-gradient(to bottom, var(--wood), var(--wood-dark)); border-color: var(--gold); }
+  .btn-small  { font-size: 6px; padding: 6px 8px; }
+  .toolbar {
+    background: var(--wood-dark); border-top: 3px solid var(--gold);
+    padding: 10px 16px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  }
+  .skull { position: absolute; top: -14px; left: 12px; font-size: 20px; }
+  .candle { position: absolute; bottom: 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .candle.left { left: 12px; } .candle.right { right: 12px; }
+  .candle-flame { width: 8px; height: 12px; background: #ffaa00; border-radius: 50% 50% 30% 30%; animation: flicker 0.8s ease-in-out infinite alternate; box-shadow: 0 0 8px #ff8800; }
+  @keyframes flicker { from { transform: scaleX(1) scaleY(1); background: #ffcc00; } to { transform: scaleX(0.7) scaleY(1.15); background: #ff8800; } }
+  .candle-body { width: 10px; height: 24px; background: linear-gradient(to right, #e8e8c0, #c8c8a0, #e8e8c0); border-radius: 2px; }
+  .section-title { font-size: 7px; color: var(--wood-dark); letter-spacing: 2px; margin-bottom: 10px; padding-bottom: 4px; border-bottom: 2px solid var(--parchment-dark); }
+
+  /* QUEST ITEMS */
+  .quest-item {
+    background: rgba(0,0,0,0.08); border: 2px dashed var(--parchment-dark);
+    border-radius: 2px; padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    transition: opacity 0.3s;
+  }
+  .quest-item.completed { opacity: 0.4; text-decoration: line-through; }
+  .quest-icon { font-size: 18px; flex-shrink: 0; }
+  .quest-name { color: var(--text-dark); font-size: 8px; margin-bottom: 4px; }
+  .quest-sub  { color: var(--btn-orange); font-size: 7px; }
+  .quest-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+  /* COLOR DOT inline */
+  .color-strip { width: 6px; height: 36px; border-radius: 2px; flex-shrink: 0; }
+
+  /* INPUTS */
+  .rpg-input {
+    font-family: 'Press Start 2P', monospace; font-size: 8px;
+    background: var(--parchment-light); border: 3px solid var(--parchment-dark);
+    border-radius: 2px; padding: 8px 10px; color: var(--text-dark); width: 100%; outline: none;
+  }
+  .rpg-input:focus { border-color: var(--gold); }
+  .form-label { display: block; font-size: 7px; color: var(--text-dark); margin-bottom: 5px; letter-spacing: 1px; }
+  .form-group { margin-bottom: 12px; }
+  .color-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-dot { width: 28px; height: 28px; border-radius: 2px; border: 3px solid rgba(0,0,0,0.3); cursor: pointer; transition: transform 0.1s; }
+  .color-dot:hover, .color-dot.selected { transform: scale(1.2); border-color: #fff; }
+
+  /* TIMER SCREEN */
+  .day-night-bar { background: linear-gradient(to right, #ff8c00, #ffcc44, #87ceeb, #1a1a4a); border: 3px solid var(--gold); height: 48px; border-radius: 2px; position: relative; margin-bottom: 16px; overflow: hidden; }
+  .sun-icon { position: absolute; top: 50%; transform: translate(-50%,-50%); width: 28px; height: 28px; background: #fff700; border-radius: 50%; border: 3px solid #ffa500; box-shadow: 0 0 12px #ffa500; transition: left 1s linear; }
+  .big-timer-box { background: #1a3a1a; border: 4px solid var(--gold); border-radius: 2px; padding: 16px; text-align: center; margin-bottom: 16px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+  .big-timer { font-size: 52px; color: #6aff3a; text-shadow: 0 0 10px #3aff1a, 0 0 20px #1aaa00; letter-spacing: 6px; line-height: 1; }
+  .big-timer.warning { color: #ffaa00; text-shadow: 0 0 10px #ff8800; animation: blink 0.8s infinite; }
+  .big-timer.danger  { color: #ff3a3a; text-shadow: 0 0 10px #ff0000; animation: blink 0.4s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  .active-quest-bar { background: var(--wood-dark); border: 2px solid var(--gold); border-radius: 2px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .active-quest-bar .quest-name { color: var(--text-gold); font-size: 9px; margin: 0; }
+  .next-quest-bar { background: rgba(0,0,0,0.1); border: 2px dashed var(--parchment-dark); border-radius: 2px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; opacity: 0.7; }
+  .next-quest-bar .quest-name { color: var(--text-dark); font-size: 7px; margin: 0; }
+  .timer-controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+  /* BOARD */
+  .board-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* STATS */
+  .stats-layout { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: start; }
+  .stat-item { display: flex; align-items: center; gap: 12px; padding: 10px; background: rgba(0,0,0,0.1); border: 2px dashed var(--parchment-dark); border-radius: 2px; margin-bottom: 8px; }
+  .stat-dot { width: 16px; height: 16px; border-radius: 2px; flex-shrink: 0; }
+  .stat-name { color: var(--text-dark); font-size: 8px; flex: 1; }
+  .stat-time { color: var(--gold); font-size: 7px; white-space: nowrap; }
+  .total-bar { background: var(--wood-dark); border: 3px solid var(--gold); border-radius: 2px; padding: 12px; text-align: center; margin-top: 12px; color: var(--text-gold); font-size: 9px; letter-spacing: 1px; }
+
+  /* MODALS */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal-box { background: var(--parchment); border: 6px solid var(--wood-dark); border-radius: 4px; width: 90%; max-width: 480px; box-shadow: 0 0 0 2px var(--gold), 8px 8px 0 rgba(0,0,0,0.6); overflow: hidden; }
+  .modal-header { background: var(--wood-dark); border-bottom: 3px solid var(--gold); padding: 12px 20px; text-align: center; }
+  .modal-header h2 { color: var(--text-gold); font-size: 11px; text-shadow: 2px 2px 0 #000; letter-spacing: 2px; }
+  .modal-body { padding: 20px; background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.02) 2px, rgba(0,0,0,0.02) 4px), var(--parchment); }
+  .modal-text { text-align: center; color: var(--text-dark); font-size: 8px; margin-bottom: 16px; line-height: 2; }
+  .modal-quest-highlight { background: var(--wood-dark); border: 2px solid var(--gold); border-radius: 2px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .modal-quest-highlight .quest-name { color: var(--text-gold); font-size: 9px; margin: 0; }
+  .modal-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .add-time-row { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .add-time-display { flex: 1; background: var(--parchment-light); border: 3px solid var(--parchment-dark); border-radius: 2px; padding: 10px; text-align: center; color: var(--btn-orange); font-size: 12px; }
+  .plus-btn { background: linear-gradient(to bottom, var(--wood), var(--wood-dark)); border: 2px solid var(--gold); border-radius: 2px; color: var(--text-gold); font-family: 'Press Start 2P', monospace; font-size: 9px; padding: 8px 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,0.4); }
+  .plus-btn:active { transform: translateY(2px); box-shadow: none; }
+  .quick-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .quick-row .rpg-btn { flex: 1; font-size: 7px; padding: 10px 4px; }
+
+  /* EDIT INLINE */
+  .edit-row { background: rgba(0,0,0,0.06); border: 2px solid var(--gold); border-radius: 2px; padding: 12px; margin-bottom: 8px; }
+  .edit-row .rpg-input { margin-bottom: 8px; }
+  .edit-actions { display: flex; gap: 6px; }
+  .empty-hint { color: var(--text-dark); font-size: 7px; line-height: 2.2; opacity: 0.6; text-align: center; padding: 20px 0; }
+
+  .locked-quest { opacity: 0.6; }
+  .locked-badge { background: var(--wood-dark); color: var(--text-gold); font-size: 7px; padding: 6px 10px; border: 2px solid var(--gold); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SCREEN 1: TIMER -->
+  <div class="screen active" id="screen-timer">
+    <div class="scroll-frame">
+      <div class="parchment-body" style="padding-bottom:52px">
+        <span class="skull">💀</span>
+        <div class="banner"><h1>⚔ QUEST TIMER ⚔</h1></div>
+        <div class="day-night-bar">
+          <div class="sun-icon" id="sunIcon" style="left:10%"></div>
+        </div>
+        <div class="big-timer-box">
+          <div class="big-timer" id="bigTimer">25:00</div>
+        </div>
+        <div class="active-quest-bar">
+          <span class="quest-icon">❗</span>
+          <div><div class="quest-name" id="activeQuestName">— No active quest —</div></div>
+        </div>
+        <div class="next-quest-bar">
+          <span class="quest-icon" style="font-size:14px">📜</span>
+          <div><div class="quest-name" id="nextQuestName">Go to Quest Board to add quests</div></div>
+        </div>
+        <div class="timer-controls">
+          <button class="rpg-btn btn-orange" id="pauseBtn" onclick="toggleTimer()">▶ Start</button>
+          <button class="rpg-btn btn-purple" onclick="resetTimer()">↺ Reset</button>
+          <button class="rpg-btn btn-green"  onclick="finishEarly()">✔ Finish Early</button>
+        </div>
+        <div class="candle left"><div class="candle-flame"></div><div class="candle-body"></div></div>
+        <div class="candle right"><div class="candle-flame"></div><div class="candle-body"></div></div>
+      </div>
+      <div class="toolbar">
+        <button class="rpg-btn btn-wood" onclick="gotoBoard()">📋 Quest Board</button>
+        <button class="rpg-btn btn-wood" onclick="openStats()">📊 Statistics</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: QUEST BOARD -->
+  <div class="screen" id="screen-quests">
+    <div class="scroll-frame">
+      <div class="parchment-body" style="padding-bottom:52px">
+        <span class="skull">💀</span>
+        <div class="banner"><h1>📋 QUEST BOARD</h1></div>
+        <div style="text-align:right;margin-bottom:12px">
+          <button class="rpg-btn btn-wood" style="font-size:7px" onclick="showForm()">+ NEW QUEST</button>
+        </div>
+        <div class="board-layout">
+          <!-- Left: quest list -->
+          <div>
+            <div class="section-title">AVAILABLE QUESTS</div>
+            <div id="questList"></div>
+            <!-- Locked placeholder -->
+            <div class="quest-item locked-quest">
+              <span class="quest-icon">🔒</span>
+              <div style="flex:1">
+                <div class="quest-name">Ancient Lich's Crypt</div>
+                <div class="quest-sub">Req: Level 15</div>
+              </div>
+              <span class="locked-badge">Locked</span>
+            </div>
+          </div>
+          <!-- Right: form / hint -->
+          <div>
+            <div id="formPanel" style="display:none">
+              <div class="section-title" id="formTitle">NEW QUEST</div>
+              <div class="form-group">
+                <label class="form-label">QUEST NAME *</label>
+                <input class="rpg-input" id="nameInput" placeholder="Enter quest name...">
+              </div>
+              <div class="form-group">
+                <label class="form-label">NOTES (optional)</label>
+                <textarea class="rpg-input" id="noteInput" rows="3" placeholder="Add notes..." style="resize:none"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">DURATION (minutes) *</label>
+                <input class="rpg-input" id="timeInput" type="number" value="25" min="1" max="999">
+              </div>
+              <div class="form-group">
+                <label class="form-label">CATEGORY COLOR *</label>
+                <div class="color-row" id="colorRow">
+                  <div class="color-dot selected" style="background:#2255cc" data-color="#2255cc" onclick="pickColor(this)"></div>
+                  <div class="color-dot" style="background:#6633cc" data-color="#6633cc" onclick="pickColor(this)"></div>
+                  <div class="color-dot" style="background:#228833" data-color="#228833" onclick="pickColor(this)"></div>
+                  <div class="color-dot" style="background:#cc9922" data-color="#cc9922" onclick="pickColor(this)"></div>
+                  <div class="color-dot" style="background:#cc4422" data-color="#cc4422" onclick="pickColor(this)"></div>
+                  <div class="color-dot" style="background:#992222" data-color="#992222" onclick="pickColor(this)"></div>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="rpg-btn btn-green" style="flex:1" onclick="saveQuest()">✔ SAVE</button>
+                <button class="rpg-btn btn-red"   style="flex:1" onclick="hideForm()">✖ CANCEL</button>
+              </div>
+            </div>
+            <div id="hintPanel">
+              <div class="empty-hint">Click "+ NEW QUEST"<br>to begin your<br>adventure!</div>
+            </div>
+          </div>
+        </div>
+        <div class="candle left"><div class="candle-flame"></div><div class="candle-body"></div></div>
+      </div>
+      <div class="toolbar">
+        <button class="rpg-btn btn-wood" onclick="gotoScreen('screen-timer')">⬅ Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: STATS -->
+  <div class="screen" id="screen-stats">
+    <div class="scroll-frame">
+      <div class="parchment-body" style="padding-bottom:52px">
+        <span class="skull">💀</span>
+        <div class="banner"><h1>📊 TIME USAGE STATISTICS</h1></div>
+        <div class="stats-layout">
+          <div id="statsList"></div>
+          <canvas id="pieCanvas" width="120" height="120" style="border-radius:50%"></canvas>
+        </div>
+        <div class="total-bar" id="totalBar">TOTAL TIME: 0 minutes</div>
+        <div class="candle left"><div class="candle-flame"></div><div class="candle-body"></div></div>
+        <div class="candle right"><div class="candle-flame"></div><div class="candle-body"></div></div>
+      </div>
+      <div class="toolbar">
+        <button class="rpg-btn btn-orange" onclick="toggleTimer()">⏸ Pause / Resume</button>
+        <button class="rpg-btn btn-purple" onclick="resetTimer()">↺ Reset</button>
+        <button class="rpg-btn btn-green"  onclick="gotoScreen('screen-timer')">⬅ Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TIME'S UP -->
+  <div class="modal-overlay" id="modal-timesup">
+    <div class="modal-box">
+      <div class="modal-header"><h2>⏰ TIME'S UP!</h2></div>
+      <div class="modal-body">
+        <p class="modal-text">Is the task finished?</p>
+        <div class="modal-quest-highlight">
+          <span class="quest-icon">❗</span>
+          <div><div class="quest-name" id="timesupName">—</div></div>
+        </div>
+        <div class="modal-btns">
+          <button class="rpg-btn btn-green" onclick="questDone()">✔ YES, FINISHED</button>
+          <button class="rpg-btn btn-red"   onclick="openAddTime()">⏳ NO, ADD TIME</button>
+        </div>
+        <div style="text-align:center;margin-top:12px">
+          <button class="rpg-btn btn-wood" onclick="closeModal('modal-timesup')">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD TIME -->
+  <div class="modal-overlay" id="modal-addtime">
+    <div class="modal-box">
+      <div class="modal-header"><h2>🕯 ADD TIME TO CONTINUE?</h2></div>
+      <div class="modal-body">
+        <p class="modal-text">How much time would you like to add?</p>
+        <div class="add-time-row">
+          <div class="add-time-display" id="addDisplay">5 minutes</div>
+          <button class="plus-btn" onclick="nudge(1)">+1</button>
+          <button class="plus-btn" onclick="nudge(5)">+5</button>
+        </div>
+        <div class="quick-row">
+          <button class="rpg-btn btn-green" onclick="setAdd(5)">+5 min</button>
+          <button class="rpg-btn btn-green" onclick="setAdd(10)">+10 min</button>
+          <button class="rpg-btn btn-green" onclick="setAdd(30)">+30 min</button>
+        </div>
+        <div class="modal-btns">
+          <button class="rpg-btn btn-green" onclick="confirmAdd()">✔ Confirm</button>
+          <button class="rpg-btn btn-red"   onclick="closeModal('modal-addtime')">✖ Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRM DELETE -->
+  <div class="modal-overlay" id="modal-delete">
+    <div class="modal-box">
+      <div class="modal-header"><h2>⚠ DELETE QUEST?</h2></div>
+      <div class="modal-body">
+        <p class="modal-text">This quest will be<br>permanently removed!</p>
+        <div class="modal-quest-highlight">
+          <span class="quest-icon">🗑</span>
+          <div><div class="quest-name" id="deleteName">—</div></div>
+        </div>
+        <div class="modal-btns">
+          <button class="rpg-btn btn-red"   onclick="confirmDelete()">🗑 DELETE</button>
+          <button class="rpg-btn btn-wood"  onclick="closeModal('modal-delete')">✖ Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ===== STATE =====
+let quests = JSON.parse(localStorage.getItem('rqt_quests') || 'null') || [
+  { name:'Defeat the Goblin Chief', time:25, color:'#cc4422', icon:'❗', reward:500 },
+  { name:'Lost Treasure Map',       time:20, color:'#cc9922', icon:'📜', reward:300 },
+  { name:'Wolves on the Prowl',     time:15, color:'#6633cc', icon:'🐺', reward:250 },
+];
+let completed = JSON.parse(localStorage.getItem('rqt_done') || '[]');
+let qi=0, secs=0, running=false, iv=null, addMins=5, selColor='#2255cc';
+let dayPct=0, editingIndex=-1, deleteIndex=-1, formMode='new';
+
+function save() {
+  localStorage.setItem('rqt_quests', JSON.stringify(quests));
+  localStorage.setItem('rqt_done',   JSON.stringify(completed));
+}
+
+// ===== NAVIGATION =====
+function gotoScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function gotoBoard() { renderQuests(); gotoScreen('screen-quests'); }
+function openStats()  { renderStats();  gotoScreen('screen-stats'); }
+
+// ===== TIMER =====
+function loadQuest(index) {
+  qi = index; secs = quests[qi].time * 60; dayPct = 0;
+  running = false; clearInterval(iv);
+  refreshDisplay(); refreshBars();
+  gotoScreen('screen-timer');
+  document.getElementById('pauseBtn').textContent = '▶ Start';
+}
+
+function toggleTimer() {
+  const btn = document.getElementById('pauseBtn');
+  if (secs <= 0) return;
+  if (running) {
+    clearInterval(iv); running = false; btn.textContent = '▶ Resume';
+  } else {
+    running = true; btn.textContent = '⏸ Pause';
+    iv = setInterval(() => {
+      if (secs > 0) {
+        secs--;
+        dayPct = 1 - secs / ((quests[qi]?.time || 25) * 60);
+        moveSun(); refreshDisplay();
+      } else {
+        clearInterval(iv); running = false;
+        btn.textContent = '▶ Start';
+        showModal('modal-timesup');
+      }
+    }, 1000);
+  }
+}
+
+function resetTimer() {
+  clearInterval(iv); running = false;
+  secs = (quests[qi] || quests[0])?.time * 60 || 25*60;
+  dayPct = 0; moveSun(); refreshDisplay();
+  document.getElementById('pauseBtn').textContent = '▶ Start';
+}
+
+function finishEarly() {
+  if (secs <= 0) return;
+  clearInterval(iv); running = false;
+  showModal('modal-timesup');
+}
+
+function refreshDisplay() {
+  const m = Math.floor(secs/60), s = secs%60;
+  const el = document.getElementById('bigTimer');
+  el.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  const pct = secs / ((quests[qi]?.time||25)*60);
+  el.className = 'big-timer' + (pct<=0.15?' danger':pct<=0.35?' warning':'');
+}
+
+function refreshBars() {
+  const active = quests.filter(q => !q.done);
+  const q  = active[0];
+  const nq = active[1];
+  if (q) {
+    document.getElementById('activeQuestName').textContent = q.icon + ' ' + q.name;
+    document.getElementById('timesupName').textContent = q.name;
+  } else {
+    document.getElementById('activeQuestName').textContent = '— No active quest —';
+  }
+  document.getElementById('nextQuestName').textContent = nq ? nq.icon + ' ' + nq.name : '(No more quests)';
+}
+
+function moveSun() {
+  const p = Math.min(Math.max(dayPct,0),1);
+  const sun = document.getElementById('sunIcon');
+  sun.style.left = (p*90+5)+'%';
+  if (p>0.6) { sun.style.background='#aaaaff'; sun.style.boxShadow='0 0 12px #6666ff'; sun.style.borderColor='#8888cc'; }
+  else       { sun.style.background='#fff700'; sun.style.boxShadow='0 0 12px #ffa500'; sun.style.borderColor='#ffa500'; }
+}
+
+// ===== QUEST BOARD =====
+function renderQuests() {
+  const el = document.getElementById('questList');
+  el.innerHTML = '';
+  const active = quests.filter(q => !q.done);
+  if (active.length === 0) {
+    el.innerHTML = '<div class="empty-hint">No quests yet!<br>Add one →</div>';
+    return;
+  }
+  active.forEach((q, i) => {
+    const realIndex = quests.indexOf(q);
+    const d = document.createElement('div');
+    d.className = 'quest-item';
+    d.id = 'qi-' + realIndex;
+    d.innerHTML = `
+      <div class="color-strip" style="background:${q.color}"></div>
+      <span class="quest-icon">${q.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div class="quest-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${q.name}</div>
+        <div class="quest-sub">${q.time} min · ${q.reward}G 🪙</div>
+      </div>
+      <div class="quest-actions">
+        <button class="rpg-btn btn-green btn-small" onclick="acceptQuest(${realIndex})">▶</button>
+        <button class="rpg-btn btn-orange btn-small" onclick="startEdit(${realIndex})">✏</button>
+        <button class="rpg-btn btn-red btn-small" onclick="askDelete(${realIndex})">🗑</button>
+      </div>`;
+    el.appendChild(d);
+  });
+}
+
+function acceptQuest(index) {
+  qi = index;
+  loadQuest(index);
+}
+
+// ===== FORM (New + Edit) =====
+function showForm() {
+  formMode = 'new'; editingIndex = -1;
+  document.getElementById('formTitle').textContent = 'NEW QUEST';
+  document.getElementById('nameInput').value = '';
+  document.getElementById('noteInput').value = '';
+  document.getElementById('timeInput').value = 25;
+  selColor = '#2255cc';
+  document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+  document.querySelector('.color-dot').classList.add('selected');
+  document.getElementById('formPanel').style.display = 'block';
+  document.getElementById('hintPanel').style.display = 'none';
+}
+
+function startEdit(index) {
+  formMode = 'edit'; editingIndex = index;
+  const q = quests[index];
+  document.getElementById('formTitle').textContent = 'EDIT QUEST';
+  document.getElementById('nameInput').value = q.name;
+  document.getElementById('noteInput').value = q.notes || '';
+  document.getElementById('timeInput').value = q.time;
+  selColor = q.color;
+  document.querySelectorAll('.color-dot').forEach(d => {
+    d.classList.toggle('selected', d.dataset.color === q.color);
+  });
+  document.getElementById('formPanel').style.display = 'block';
+  document.getElementById('hintPanel').style.display = 'none';
+}
+
+function saveQuest() {
+  const name = document.getElementById('nameInput').value.trim();
+  const time = parseInt(document.getElementById('timeInput').value) || 25;
+  const notes = document.getElementById('noteInput').value.trim();
+  if (!name) { alert('Please enter a quest name!'); return; }
+
+  if (formMode === 'edit' && editingIndex >= 0) {
+    quests[editingIndex] = { ...quests[editingIndex], name, time, notes, color: selColor, reward: time * 10 };
+  } else {
+    quests.push({ name, time, notes, color: selColor, icon:'❗', reward: time*10, done: false });
+  }
+  save(); hideForm(); renderQuests();
+}
+
+function hideForm() {
+  document.getElementById('formPanel').style.display = 'none';
+  document.getElementById('hintPanel').style.display = 'block';
+  editingIndex = -1; formMode = 'new';
+}
+
+function pickColor(el) {
+  document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+  el.classList.add('selected'); selColor = el.dataset.color;
+}
+
+// ===== DELETE =====
+function askDelete(index) {
+  deleteIndex = index;
+  document.getElementById('deleteName').textContent = quests[index].name;
+  showModal('modal-delete');
+}
+
+function confirmDelete() {
+  if (deleteIndex >= 0) {
+    quests.splice(deleteIndex, 1);
+    save(); renderQuests();
+    deleteIndex = -1;
+  }
+  closeModal('modal-delete');
+  refreshBars();
+}
+
+// ===== COMPLETE QUEST (disappear from board) =====
+function questDone() {
+  const q = quests[qi];
+  if (q) {
+    const used = q.time - Math.floor(secs/60);
+    completed.push({ name: q.name, minutes: Math.max(used,1), color: q.color });
+    // Mark as done so it disappears from board
+    quests[qi].done = true;
+    save();
+  }
+  closeModal('modal-timesup');
+  // Find next non-done quest
+  const nextActive = quests.find((q, i) => i > qi && !q.done);
+  if (nextActive) {
+    qi = quests.indexOf(nextActive);
+    loadQuest(qi);
+  } else {
+    secs = 0; running = false; clearInterval(iv);
+    refreshDisplay(); refreshBars();
+    openStats();
+  }
+}
+
+// ===== ADD TIME =====
+function openAddTime() { closeModal('modal-timesup'); addMins=5; updateAddDisplay(); showModal('modal-addtime'); }
+function nudge(n) { addMins = Math.max(1, addMins+n); updateAddDisplay(); }
+function setAdd(n) { addMins = n; updateAddDisplay(); }
+function updateAddDisplay() { document.getElementById('addDisplay').textContent = addMins + ' minutes'; }
+function confirmAdd() {
+  secs += addMins * 60; closeModal('modal-addtime');
+  refreshDisplay(); if (!running) toggleTimer();
+}
+
+// ===== STATS =====
+function renderStats() {
+  const fallback = [
+    { name:'Defeat the Goblin Chief', minutes:20, color:'#cc4422' },
+    { name:'Lost Treasure Map',       minutes:16, color:'#cc9922' },
+    { name:'Wolves on the Prowl',     minutes:26, color:'#6633cc' },
+  ];
+  const data = completed.length ? completed : fallback;
+  const total = data.reduce((s,q) => s+q.minutes, 0);
+  const list = document.getElementById('statsList');
+  list.innerHTML = '';
+  data.forEach(q => {
+    const d = document.createElement('div');
+    d.className = 'stat-item';
+    d.innerHTML = `<div class="stat-dot" style="background:${q.color}"></div>
+      <div class="stat-name">${q.name}</div>
+      <div class="stat-time">Done | ${q.minutes} min</div>`;
+    list.appendChild(d);
+  });
+  const h=Math.floor(total/60), m=total%60;
+  document.getElementById('totalBar').textContent = h
+    ? `TOTAL TIME: ${h} hr ${m} minutes`
+    : `TOTAL TIME: ${m} minutes`;
+  const canvas=document.getElementById('pieCanvas'), ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,120,120);
+  if (total === 0) return;
+  let angle = -Math.PI/2;
+  data.forEach(q => {
+    const slice = (q.minutes/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(60,60); ctx.arc(60,60,56,angle,angle+slice);
+    ctx.fillStyle=q.color; ctx.fill();
+    ctx.strokeStyle='#3d1f0a'; ctx.lineWidth=2; ctx.stroke();
+    angle+=slice;
+  });
+}
+
+// ===== MODALS =====
+function showModal(id)  { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// ===== INIT =====
+refreshDisplay(); refreshBars(); renderQuests();
+</script>
+</body>
+</html>
