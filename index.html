@@ -27,12 +27,53 @@
     --btn-purple-light: #6a40b0;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; image-rendering: pixelated; }
+
+  body, button, input, textarea {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ctext y='28' font-size='28'%3E%F0%9F%97%A1%3C/text%3E%3C/svg%3E") 4 28, auto;
+  }
+
   body {
     background: var(--bg-dark);
     font-family: 'Press Start 2P', monospace;
     min-height: 100vh;
     display: flex; align-items: center; justify-content: center;
   }
+
+  /* ===== INTRO SCREEN ===== */
+  .intro-wrap {
+    width: 100%; display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .intro-frame {
+    background: var(--parchment);
+    border: 6px solid var(--wood-dark); border-radius: 4px;
+    box-shadow: 0 0 0 2px var(--gold), 12px 12px 0 rgba(0,0,0,0.7);
+    width: 100%; max-width: 580px; overflow: hidden;
+  }
+  .intro-frame::before, .intro-frame::after {
+    content: ''; display: block; height: 28px;
+    background: linear-gradient(to bottom, var(--wood), var(--wood-dark));
+    border-top: 3px solid var(--gold); border-bottom: 3px solid var(--gold);
+  }
+  .intro-body {
+    background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px), var(--parchment);
+    padding: 36px 32px 48px; text-align: center; position: relative;
+  }
+  .intro-eyebrow { color: var(--wood-dark); font-size: 8px; letter-spacing: 3px; margin-bottom: 20px; opacity: 0.7; }
+  .intro-logo { font-size: 56px; margin: 0 0 20px; display: block; animation: float 2.5s ease-in-out infinite; }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  .intro-title-box {
+    background: var(--wood-dark); border: 3px solid var(--gold); border-radius: 2px;
+    padding: 12px 24px; display: inline-block; margin-bottom: 20px;
+  }
+  .intro-title-box span { color: var(--text-gold); font-size: 16px; letter-spacing: 4px; text-shadow: 2px 2px 0 #000; }
+  .intro-desc { color: var(--text-dark); font-size: 8px; line-height: 2.4; margin: 0 0 28px; opacity: 0.75; }
+  .intro-question { color: var(--wood-dark); font-size: 10px; margin-bottom: 20px; letter-spacing: 2px; animation: textflicker 2s ease-in-out infinite; }
+  @keyframes textflicker { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+  .intro-btns { display: flex; gap: 16px; justify-content: center; }
+  .intro-btns .rpg-btn { font-size: 10px; padding: 14px 28px; min-width: 130px; }
+  .intro-candle { position: absolute; bottom: 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .intro-candle.left { left: 14px; } .intro-candle.right { right: 14px; }
   body::before {
     content: ''; position: fixed; inset: 0;
     background-image:
@@ -166,8 +207,35 @@
 <body>
 <div class="app">
 
-  <!-- SCREEN 1: TIMER -->
-  <div class="screen active" id="screen-timer">
+  <!-- ====== SCREEN 0: INTRO ====== -->
+  <div class="screen active" id="screen-intro">
+    <div class="intro-wrap">
+      <div class="intro-frame">
+        <div class="intro-body">
+          <div class="intro-eyebrow">— WELCOME, ADVENTURER —</div>
+          <span class="intro-logo">⚔️</span>
+          <div class="intro-title-box">
+            <span>QUEST TIMER</span>
+          </div>
+          <div class="intro-desc">
+            Track your quests.<br>
+            Conquer your tasks.<br>
+            Claim your glory.
+          </div>
+          <div class="intro-question">Are you ready to begin?</div>
+          <div class="intro-btns">
+            <button class="rpg-btn btn-green" onclick="enterAdventure()">⚔ YES, LET'S GO!</button>
+            <button class="rpg-btn btn-red"   onclick="refuseAdventure()">✖ NOT YET</button>
+          </div>
+          <div class="intro-candle left"><div class="candle-flame"></div><div class="candle-body"></div></div>
+          <div class="intro-candle right"><div class="candle-flame"></div><div class="candle-body"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== SCREEN 1: TIMER ====== -->
+  <div class="screen" id="screen-timer">
     <div class="scroll-frame">
       <div class="parchment-body" style="padding-bottom:56px">
         <span class="skull">💀</span>
@@ -352,6 +420,20 @@
 
 </div>
 <script>
+// ===== INTRO =====
+function enterAdventure() {
+  gotoBoard();
+}
+
+function refuseAdventure() {
+  // shake the YES button playfully
+  const btn = document.querySelector('#screen-intro .btn-green');
+  const q   = document.querySelector('#screen-intro .intro-question');
+  q.textContent = 'Are you... sure about that? 👀';
+  btn.style.animation = 'shake 0.4s';
+  setTimeout(() => { btn.style.animation = ''; q.textContent = 'Come on, just click YES! ⚔'; }, 500);
+}
+
 // ===== STATE =====
 let quests    = JSON.parse(localStorage.getItem('rqt_quests') || '[]');
 let completed = JSON.parse(localStorage.getItem('rqt_done')   || '[]');
